@@ -5,4 +5,7 @@ module org.cppisbetter.execarver {
 
     opens org.cppisbetter.execarver to javafx.fxml;
     exports org.cppisbetter.execarver;
+
+    opens org.cppisbetter.execarver.controller to javafx.fxml;
+    exports org.cppisbetter.execarver.controller;
 }

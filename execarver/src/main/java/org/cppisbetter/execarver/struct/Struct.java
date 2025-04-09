@@ -34,18 +34,49 @@ import java.util.regex.Pattern;
 ///
 public class Struct {
 
-
-    public static AssocMap unpack(String formatString, byte[] bytes) {
+    ///
+    /// PURPOSE
+    ///     Interface for unpacking
+    ///
+    /// DETAILS
+    ///     Extracts information for each format string
+    ///
+    /// PARAMS
+    ///     [in] formatString - format string as described above
+    ///     [in] bytes        - array of bytes to be unpacked
+    ///     [in] startIndex   - where to start unpacking
+    ///                         defaults to zero if you use the overloaded function
+    /// RETURNS
+    ///     AssocMap containing variables => unpacked values
+    ///
+    public static AssocMap unpack(String formatString, byte[] bytes, int startIndex) {
         AssocMap map = new AssocMap();
 
         String[] formats = formatString.split("/");
-        int counter = 0;
+        int counter = startIndex;
         for( String fmt : formats) {
             counter = getNextValue(fmt, bytes, counter, map);
         }
         return map;
     }
 
+    public static AssocMap unpack(String formatString, byte[] bytes) {
+        return unpack(formatString, bytes, 0);
+    }
+
+    ///
+    /// PURPOSE
+    ///     Unpack a value
+    ///
+    /// PARAMS
+    ///     [in] format - individial format string
+    ///     [in] bytes  - bytes where data is
+    ///     [in,out] counter - marks current position in bytes
+    ///     [in,out] output  - map to add variables to
+    ///
+    /// RETURNS
+    ///     Updated counter i.e. counter += size of unpacked value
+    ///
     private static int getNextValue(String format, byte[] bytes, int counter, AssocMap output) {
 
         String name = Struct.getVariableName(format);
@@ -54,26 +85,29 @@ public class Struct {
         Object value = null;
 
         switch(fmtChar) {
-            case 'V':
+            case 'V':   // UIN32T,LE
                 value = Integer.reverseBytes(extractInt(counter, bytes));
                 counter += 4;
 
                 break;
-            case 'v':
+            case 'v':   // UINT16, LE
                 value = extractShort(counter, bytes);
                 counter += 2;
                 break;
-            case 'Q':
+            case 'Q':   // UINT64, LE
             case 'P':
                 value = extractLong(counter, bytes);
                 counter += 8;
                 break;
 
-            case 'x':
+            case 'x':   // byte skip
                 int skip = getBytesFromVariableFmtString(format);
 
                 counter += skip;
                 return counter;
+
+            // TODO: Add exception here
+
         }
 
         output.set(name, value);
@@ -87,11 +121,10 @@ public class Struct {
         // 1 to skip fmt identifier
         for(int i = 1; i < fmtString.length(); i++) {
             char c = fmtString.charAt(i);
-            if(Character.isDigit(c)) {
+            if(Character.isDigit(c))
                 number = number * 10 + (c - '0');
-            } else {
+            else
                 break;
-            }
         }
 
         return number;
