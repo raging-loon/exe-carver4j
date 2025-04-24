@@ -18,10 +18,24 @@ public class PE32 implements BaseCarver {
 
     public void parse() {
         parseDOSHeader();
+        parseNTHeader();
+    }
+
+    public String getMachineType() {
+        if (m_NTHeaders == null)
+            return "";
+
+        short id = m_NTHeaders.getUINT16("Machine");
+
+        return switch (id) {
+            case 0x014c -> "Intel I386";
+            case (short)0x866C -> "x64";
+            default -> "Unknown";
+        };
     }
 
     public AssocMap getDOSHeader() { return m_DOSHeader; }
-
+    public AssocMap getNTHeaders() { return m_NTHeaders; }
     private void parseDOSHeader() {
         String dosFmtString =
                 "ve_magic/ve_cblp/ve_cp/ve_crlc/ve_cparhdr/ve_minalloc/" +
@@ -37,7 +51,7 @@ public class PE32 implements BaseCarver {
         String ntHeaderFormat =
                 "VSignature/vMachine/vNumberOfSections/VTimeStamp/VPointerToSymbolTable/" +
                 "VNumberOfSymbols/vSizeOfOptionalHeader/vCharacteristics/" +
-                "vMajor/CMajorLinkerVersion/CMinorLinkerVersion/VSizeOfCode/VSizeOfInitializedData/" +
+                "vMagic/CMajorLinkerVersion/CMinorLinkerVersion/VSizeOfCode/VSizeOfInitializedData/" +
                 "VSizeOfUninitializedData/VAddressOfEntryPoint/VBaseOfCode/QImageBase/" +
                 "VSectionAlignment/VFileAlignment/vMajorOSVersion/vMinorOSVersion/vMajorImageVersion/" +
                 "vMinorImageVersion/vMajorSubSystemVersion/vMinorSubsystemVersion/VWin32VersionValue/" +
@@ -46,7 +60,6 @@ public class PE32 implements BaseCarver {
                 "VLoaderFlags/VNumberOfRvaAndSizes";
 
         m_NTHeaders = Struct.unpack(ntHeaderFormat, m_fileBytes, m_DOSHeader.getInt("e_lfanew"));
-
     }
 
 }

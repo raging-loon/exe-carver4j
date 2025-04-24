@@ -9,10 +9,13 @@ import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.AnchorPane;
+import javafx.util.Pair;
 import org.cppisbetter.execarver.carver.PE32.PE32;
+import org.cppisbetter.execarver.struct.AssocMap;
 import org.cppisbetter.execarver.struct.UnpackedValue;
 
 import java.util.Map;
+import java.util.Optional;
 
 public class PEViewController {
     private AnchorPane m_infoPane;
@@ -34,58 +37,122 @@ public class PEViewController {
         if(m_exe.getDOSHeader() != null){
             TreeItem<String> dosHeaderItem = new TreeItem<>("DOS Header");
             root.getChildren().add(dosHeaderItem);
-
         }
+
+        if(m_exe.getNTHeaders() != null) {
+            createNTHeaderTreeView(root);
+        }
+
         m_infoView.setRoot(root);
         m_infoView.getSelectionModel().selectedItemProperty().addListener(
             (obs, old, _new) -> {
-                if(_new != null) {
-                    createDOSTable();
+                switch(_new.getValue())
+                {
+                    case "DOS Header"       -> createDOSTable2();
+                    case "NT Headers"       -> createNTTable();
+                    case "File Header"      -> createFileHeaderTable();
+                    case "Optional Header"  -> createOptionalHeaderTable();
                 }
             }
         );
     }
 
-    public void createDOSTable() {
-        ObservableList<Map.Entry<String, UnpackedValue>> items =
-                FXCollections.observableArrayList(m_exe.getDOSHeader().entrySet());
+    private void createNTHeaderTreeView(TreeItem<String> root) {
+        TreeItem<String> ntRoot = new TreeItem<>("NT Headers");
 
-        TableView<Map.Entry<String, UnpackedValue>> dosTable = new TableView<>();
-        dosTable.setItems(items);
+        ntRoot.getChildren().add(new TreeItem<>("File Header"));
 
-        TableColumn<Map.Entry<String, UnpackedValue>, String> memberCol = new TableColumn<>("Member");
-        memberCol.setCellValueFactory(cell -> new SimpleObjectProperty<>(cell.getValue().getKey()));
+        TreeItem<String> optHeaderRoot = new TreeItem<>("Optional Header");
+        optHeaderRoot.getChildren().add(new TreeItem<>("Data Directories"));
 
+        ntRoot.getChildren().add(optHeaderRoot);
 
-        TableColumn<Map.Entry<String, UnpackedValue>, String> value = new TableColumn<>("Value");
-        value.setCellValueFactory(
-                cell -> {
-                    return new SimpleObjectProperty<>(
-                        cell.getValue().getValue().toString()
-                    );
-                }
-        );
-
-        TableColumn<Map.Entry<String, UnpackedValue>, String> offsets = new TableColumn<>("Offset");
-
-        offsets.setCellValueFactory(
-                cell -> {
-                    return new SimpleObjectProperty<>(
-                        String.format("%08X", cell.getValue().getValue().getOffset())
-                    );
-                }
-        );
-
-        TableColumn<Map.Entry<String, UnpackedValue>, String> types = new TableColumn<>("Size");
-        types.setCellValueFactory(
-                cell -> {
-                    return new SimpleObjectProperty<>(cell.getValue().getValue().getSizeType());
-                }
-        );
-
-        dosTable.getColumns().addAll(memberCol, offsets, types, value);
-
-        m_infoPane.getChildren().setAll(dosTable);
+        root.getChildren().add(ntRoot);
     }
 
+    private void createDOSTable2() {
+            var table =
+                createMOSVTable()
+                    .setData(FXCollections.observableArrayList(m_exe.getDOSHeader().entrySet()))
+                    .build();
+
+            m_infoPane.getChildren().setAll(table);
+    }
+
+    private void createNTTable() {
+        // sloppy
+        AssocMap ntHeader = m_exe.getNTHeaders();
+        // we only have one value
+        var table =
+            createMOSVTable()
+                .setData(FXCollections.observableArrayList(ntHeader.entrySet().stream().findFirst().get()))
+                .build();
+        m_infoPane.getChildren().setAll(table);
+
+
+    }
+
+    private void createFileHeaderTable() {
+        var data = m_exe.getNTHeaders().entrySet().stream().toList().subList(1, 8);
+
+        var table =
+            createMOSVTable()
+                .newColumn("Meaning", cell -> {
+                        String value = "";
+                        System.out.println(cell.getValue().getKey());
+
+                        if (cell.getValue().getKey().equals("Machine")) {
+                            value = m_exe.getMachineType();
+                        }
+                        return new SimpleObjectProperty<>(
+                            value
+                        );
+                    }
+                )
+                .setData(FXCollections.observableArrayList(data))
+                .build();
+        m_infoPane.getChildren().setAll(table);
+
+    }
+
+    private void createOptionalHeaderTable() {
+        var data = m_exe.getNTHeaders().entrySet().stream().toList().subList(9, 37);
+
+        var table =
+            createMOSVTable()
+                .newColumn("Meaning", cell -> {
+                    String value = "";
+                    return new SimpleObjectProperty<>(
+                            value
+                    );
+                }
+                )
+                .setData(FXCollections.observableArrayList(data))
+                .build();
+        m_infoPane.getChildren().addAll(table);
+    }
+
+    private TableBuilder<Map.Entry> createMOSVTable() {
+        return TableBuilder.of(Map.Entry.class)
+                .newColumn("Member", cell -> {
+                    return new SimpleObjectProperty<>(
+                            cell.getValue().getKey()
+                    );
+                })
+                .newColumn("Offset", cell -> {
+                    UnpackedValue uv = (UnpackedValue) cell.getValue().getValue();
+                    return new SimpleObjectProperty<>(
+                            String.format("%08X", uv.getOffset())
+                    );
+                })
+                .newColumn("Type", cell -> {
+                    UnpackedValue uv = (UnpackedValue) cell.getValue().getValue();
+                    return new SimpleObjectProperty<>(uv.getSizeType());
+                })
+                .newColumn("Value", cell -> {
+                    return new SimpleObjectProperty<>(
+                            cell.getValue().getValue()
+                    );
+                });
+    }
 }

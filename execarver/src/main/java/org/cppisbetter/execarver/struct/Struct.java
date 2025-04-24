@@ -104,7 +104,10 @@ public class Struct {
 
                 counter += skip;
                 return counter;
-
+            case 'C':
+                value = bytes[counter];
+                counter++;
+                break;
             // TODO: Add exception here
 
         }
