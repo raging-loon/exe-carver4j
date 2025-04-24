@@ -81,9 +81,8 @@ public class Struct {
 
         String name = Struct.getVariableName(format);
         char fmtChar = format.charAt(0);
-
+        int oldCounter = counter;
         Object value = null;
-
         switch(fmtChar) {
             case 'V':   // UIN32T,LE
                 value = Integer.reverseBytes(extractInt(counter, bytes));
@@ -109,8 +108,8 @@ public class Struct {
             // TODO: Add exception here
 
         }
-
-        output.set(name, value);
+        UnpackedValue uv = new UnpackedValue(value, counter - oldCounter, counter);
+        output.set(name, uv);
 
         return counter;
     }
@@ -152,9 +151,9 @@ public class Struct {
     }
 
     private static short extractShort(int counter, byte[] array) {
-        return (short)(
-                array[counter]
-            | ((array[counter + 1]) << 8));
+        short part1 = (short)((array[counter] << 8) & 0xff00);
+        short part2 = (short)(array[counter + 1] & 0xff);
+        return (short)(((part1 >> 8) & 0x000000ff) | ((part2 << 8) & 0x0000ff00));
     }
 
     private static long extractLong(int counter, byte[] array) {

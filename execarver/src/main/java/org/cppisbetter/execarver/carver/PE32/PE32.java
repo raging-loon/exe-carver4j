@@ -1,10 +1,11 @@
 package org.cppisbetter.execarver.carver.PE32;
 
+import org.cppisbetter.execarver.carver.BaseCarver;
 import org.cppisbetter.execarver.struct.AssocMap;
 import org.cppisbetter.execarver.struct.Struct;
 
 
-public class PE32 {
+public class PE32 implements BaseCarver {
 
     private AssocMap m_DOSHeader;
     private AssocMap m_NTHeaders;
@@ -18,6 +19,8 @@ public class PE32 {
     public void parse() {
         parseDOSHeader();
     }
+
+    public AssocMap getDOSHeader() { return m_DOSHeader; }
 
     private void parseDOSHeader() {
         String dosFmtString =

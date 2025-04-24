@@ -22,5 +22,6 @@ public class Main extends Application {
         controller.initialize(stage);
         stage.setScene(scene);
         stage.show();
+
     }
 }
