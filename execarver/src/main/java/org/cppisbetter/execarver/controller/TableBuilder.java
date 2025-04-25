@@ -1,10 +1,13 @@
 package org.cppisbetter.execarver.controller;
 
 import javafx.beans.Observable;
+import javafx.beans.binding.Bindings;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.ObservableList;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.skin.TableHeaderRow;
+import javafx.scene.layout.AnchorPane;
 import javafx.util.Callback;
 
 import java.util.ArrayList;
@@ -39,8 +42,23 @@ public class TableBuilder<T> {
         TableView<T> table = new TableView<>();
         if (m_data != null)
             table.setItems(m_data);
-
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.getColumns().addAll(m_cols);
+
+//        int rowCount = m_data.size();
+//
+//        TableHeaderRow headerRow = (TableHeaderRow) table.lookup("TableHeaderRow");
+//
+//        double tableHeight = (rowCount * table.getFixedCellSize())
+//                + table.getInsets().getTop() + table.getInsets().getBottom()
+//                + (headerRow == null ? 0 : headerRow.getHeight());
+//
+//        table.setPrefHeight(tableHeight);
+//        table.setMinHeight(tableHeight);
+//        table.setMinHeight(tableHeight);
+//
+        table.setFixedCellSize(25);
+        table.prefHeightProperty().bind(Bindings.size(table.getItems()).multiply(table.getFixedCellSize()).add(30));
         return table;
     }
 

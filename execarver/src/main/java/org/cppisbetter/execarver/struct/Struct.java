@@ -111,7 +111,7 @@ public class Struct {
             // TODO: Add exception here
 
         }
-        UnpackedValue uv = new UnpackedValue(value, counter - oldCounter, counter);
+        UnpackedValue uv = new UnpackedValue(value, counter - oldCounter, oldCounter);
         output.set(name, uv);
 
         return counter;
@@ -133,8 +133,8 @@ public class Struct {
     }
 
     private static String getVariableName(String fmtString) {
-        Matcher m = Pattern.compile("\\w\\d*(\\S+)").matcher(fmtString);
-
+//        Matcher m = Pattern.compile("\\w\\d*(\\S+)").matcher(fmtString);
+        Matcher m = Pattern.compile("\\w\\d*((?:\\S+\\s*)+)").matcher(fmtString);
         if(m.find())
             return m.group(1);
 

@@ -52,6 +52,7 @@ public class PEViewController {
                     case "NT Headers"       -> createNTTable();
                     case "File Header"      -> createFileHeaderTable();
                     case "Optional Header"  -> createOptionalHeaderTable();
+                    case "Data Directories" -> createDataDirectoriesTable();
                 }
             }
         );
@@ -61,9 +62,12 @@ public class PEViewController {
         TreeItem<String> ntRoot = new TreeItem<>("NT Headers");
 
         ntRoot.getChildren().add(new TreeItem<>("File Header"));
+        ntRoot.setExpanded(true);
 
         TreeItem<String> optHeaderRoot = new TreeItem<>("Optional Header");
+
         optHeaderRoot.getChildren().add(new TreeItem<>("Data Directories"));
+        optHeaderRoot.setExpanded(true);
 
         ntRoot.getChildren().add(optHeaderRoot);
 
@@ -76,7 +80,7 @@ public class PEViewController {
                     .setData(FXCollections.observableArrayList(m_exe.getDOSHeader().entrySet()))
                     .build();
 
-            m_infoPane.getChildren().setAll(table);
+            setTable(table);
     }
 
     private void createNTTable() {
@@ -87,7 +91,7 @@ public class PEViewController {
             createMOSVTable()
                 .setData(FXCollections.observableArrayList(ntHeader.entrySet().stream().findFirst().get()))
                 .build();
-        m_infoPane.getChildren().setAll(table);
+        setTable(table);
 
 
     }
@@ -111,17 +115,23 @@ public class PEViewController {
                 )
                 .setData(FXCollections.observableArrayList(data))
                 .build();
-        m_infoPane.getChildren().setAll(table);
+        setTable(table);
+
 
     }
 
     private void createOptionalHeaderTable() {
-        var data = m_exe.getNTHeaders().entrySet().stream().toList().subList(9, 37);
+        var data = m_exe.getNTHeaders().entrySet().stream().toList().subList(8, 37);
 
         var table =
             createMOSVTable()
                 .newColumn("Meaning", cell -> {
                     String value = "";
+
+                    if(cell.getValue().getKey().equals("Magic")) {
+                        value = m_exe.is32Bit() ? "PE32": "PE32+";
+                    }
+
                     return new SimpleObjectProperty<>(
                             value
                     );
@@ -129,9 +139,25 @@ public class PEViewController {
                 )
                 .setData(FXCollections.observableArrayList(data))
                 .build();
-        m_infoPane.getChildren().addAll(table);
+        setTable(table);
+
     }
 
+    private void createDataDirectoriesTable() {
+        var data = m_exe.getDataDirectories();
+
+        var table = createMOSVTable().setData(FXCollections.observableArrayList(data.entrySet())).build();
+
+        setTable(table);
+
+
+    }
+
+    ///
+    /// PURPOSE
+    ///     A lot of tables use the format "Member | Offset | Size | Value"
+    ///     This automates construction of such fields
+    ///
     private TableBuilder<Map.Entry> createMOSVTable() {
         return TableBuilder.of(Map.Entry.class)
                 .newColumn("Member", cell -> {
@@ -145,7 +171,7 @@ public class PEViewController {
                             String.format("%08X", uv.getOffset())
                     );
                 })
-                .newColumn("Type", cell -> {
+                .newColumn("Size", cell -> {
                     UnpackedValue uv = (UnpackedValue) cell.getValue().getValue();
                     return new SimpleObjectProperty<>(uv.getSizeType());
                 })
@@ -154,5 +180,11 @@ public class PEViewController {
                             cell.getValue().getValue()
                     );
                 });
+    }
+
+    private void setTable(TableView<?> newTable) {
+        if(!m_infoPane.getChildren().isEmpty())
+            m_infoPane.getChildren().removeFirst();
+        m_infoPane.getChildren().add(newTable);
     }
 }

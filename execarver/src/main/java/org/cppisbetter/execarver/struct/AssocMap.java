@@ -24,8 +24,8 @@ public class AssocMap {
         m_map.put(key, value);
     }
 
-    public <T> T get(String key) {
-        return (T)m_map.get(key).getValue();
+    public UnpackedValue get(String key) {
+        return m_map.get(key);
     }
 
     public int getInt(String key) {
