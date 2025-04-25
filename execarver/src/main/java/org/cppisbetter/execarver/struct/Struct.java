@@ -108,6 +108,12 @@ public class Struct {
                 value = bytes[counter];
                 counter++;
                 break;
+            case 'a':
+                int maxLen = getBytesFromVariableFmtString(format);
+                value = extractString(counter, maxLen, bytes);
+                counter += maxLen;
+                break;
+
             // TODO: Add exception here
 
         }
@@ -170,4 +176,18 @@ public class Struct {
         return value;
     }
 
+
+    private static String extractString(int counter, int maxLen, byte[] array) {
+        StringBuilder extract = new StringBuilder();
+        System.out.println("Got extract string: " + maxLen);
+
+        for(int i = counter; i < counter + maxLen; i++) {
+            if(array[i] == 0)
+                break;
+
+            extract.append((char)array[i]);
+        }
+
+        return extract.toString();
+    }
 }

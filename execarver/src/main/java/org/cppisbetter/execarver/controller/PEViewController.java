@@ -11,11 +11,15 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.AnchorPane;
 import javafx.util.Pair;
 import org.cppisbetter.execarver.carver.PE32.PE32;
+import org.cppisbetter.execarver.carver.PE32.SectionHeader;
 import org.cppisbetter.execarver.struct.AssocMap;
 import org.cppisbetter.execarver.struct.UnpackedValue;
 
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class PEViewController {
     private AnchorPane m_infoPane;
@@ -43,6 +47,12 @@ public class PEViewController {
             createNTHeaderTreeView(root);
         }
 
+        if(m_exe.getSectionHeaders() != null) {
+            TreeItem<String> newItem = new TreeItem<>("Section Headers");
+            root.getChildren().add(newItem);
+
+        }
+
         m_infoView.setRoot(root);
         m_infoView.getSelectionModel().selectedItemProperty().addListener(
             (obs, old, _new) -> {
@@ -53,6 +63,7 @@ public class PEViewController {
                     case "File Header"      -> createFileHeaderTable();
                     case "Optional Header"  -> createOptionalHeaderTable();
                     case "Data Directories" -> createDataDirectoriesTable();
+                    case "Section Headers"  -> createSectionHeadersTable();
                 }
             }
         );
@@ -186,5 +197,64 @@ public class PEViewController {
         if(!m_infoPane.getChildren().isEmpty())
             m_infoPane.getChildren().removeFirst();
         m_infoPane.getChildren().add(newTable);
+    }
+
+    private void createSectionHeadersTable() {
+
+        var table = TableBuilder.of(Map.Entry.class)
+                .newColumn("Name", cell -> new SimpleObjectProperty<>(cell.getValue().getKey()))
+                .newColumn("Virtual Size", cell -> {
+                    return extractAndFormatFromSectionHeader(cell, "getVirtualSize", 4);
+                })
+                .newColumn("Virtual Address", cell -> {
+                    return extractAndFormatFromSectionHeader(cell, "getVirtualAddress", 4);
+                })
+                .newColumn("Raw Size", cell -> {
+                    return extractAndFormatFromSectionHeader(cell, "getRawSize", 4);
+                })
+                .newColumn("Raw Address", cell -> {
+                    return extractAndFormatFromSectionHeader(cell, "getRawAddress", 4);
+                })
+                .newColumn("Reloc Address", cell -> {
+                    return extractAndFormatFromSectionHeader(cell, "getRelocAddress", 4);
+                })
+                .newColumn("Linenumbers", cell -> {
+                    return extractAndFormatFromSectionHeader(cell, "getLineNumbers", 4);
+                })
+                .newColumn("Relocations Number", cell -> {
+                    return extractAndFormatFromSectionHeader(cell, "getRelocationsNumber", 2);
+                })
+                .newColumn("Line Numbers", cell -> {
+                    return extractAndFormatFromSectionHeader(cell, "getLineNumbersNumber", 2);
+                })
+                .newColumn("Characteristics", cell -> {
+                    return extractAndFormatFromSectionHeader(cell, "getCharacteristics", 4);
+                })
+                .setData(FXCollections.observableArrayList(m_exe.getSectionHeaders().entrySet()))
+                .build();
+
+        setTable(table);
+    }
+
+    private <T> SimpleObjectProperty<T>
+    extractAndFormatFromSectionHeader(TableColumn.CellDataFeatures<Map.Entry, Object> cell, String name, int size) {
+        SectionHeader header = (SectionHeader)(cell.getValue().getValue());
+        try {
+
+            Method method = header.getClass().getMethod(name);
+
+            Object value = method.invoke(header);
+
+            String fmt = String.format("%%0%dX", size * 2);
+
+            return new SimpleObjectProperty<T>((T)String.format(fmt, value));
+
+
+        } catch(Exception e) {
+            throw new RuntimeException(e);
+        }
+
+
+
     }
 }

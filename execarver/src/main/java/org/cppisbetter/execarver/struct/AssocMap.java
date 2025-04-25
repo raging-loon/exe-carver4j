@@ -48,6 +48,9 @@ public class AssocMap {
         return (byte)m_map.get(key).getValue();
     }
 
+    public String getString(String key) {
+        return (String)m_map.get(key).getValue();
+    }
 
     public Set<Map.Entry<String, UnpackedValue>> entrySet() {
         return m_map.entrySet();

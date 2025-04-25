@@ -5,13 +5,20 @@ import org.cppisbetter.execarver.struct.AssocMap;
 import org.cppisbetter.execarver.struct.Struct;
 import org.cppisbetter.execarver.struct.UnpackedValue;
 
+import java.util.LinkedHashMap;
+
 
 public class PE32 implements BaseCarver {
 
     private AssocMap m_DOSHeader;
     private AssocMap m_NTHeaders;
     private AssocMap m_DataDirectories;
+
+    private LinkedHashMap<String, SectionHeader> m_sectionHeaders;
+
     private final byte[] m_fileBytes;
+
+
 
     public PE32(byte[] file) {
         m_fileBytes = file;
@@ -20,6 +27,12 @@ public class PE32 implements BaseCarver {
     public void parse() {
         parseDOSHeader();
         parseNTHeader();
+
+        if (m_NTHeaders.getUINT16("NumberOfSections") != 0) {
+            m_sectionHeaders = new LinkedHashMap<>();
+            parseSectionHeaders();
+        }
+
         parseDataDirectories();
     }
 
@@ -45,6 +58,10 @@ public class PE32 implements BaseCarver {
     public AssocMap getNTHeaders() { return m_NTHeaders; }
 
     public AssocMap getDataDirectories() { return m_DataDirectories; }
+
+    public LinkedHashMap<String, SectionHeader> getSectionHeaders() {
+        return m_sectionHeaders;
+    }
 
     private void parseDOSHeader() {
         String dosFmtString =
@@ -109,5 +126,35 @@ public class PE32 implements BaseCarver {
 
 
         m_DataDirectories = Struct.unpack(formatString.toString(), m_fileBytes, offset);
+    }
+
+    public void parseSectionHeaders() {
+        int sectHdrOffset = m_NTHeaders.get("Magic").getOffset() + m_NTHeaders.getUINT16("SizeOfOptionalHeader");
+
+        short numSections = m_NTHeaders.getUINT16("NumberOfSections");
+
+        String fmt = "a8Name/VVirtualSize/VVirtualAddress/VSizeOfRawData/"+
+                     "VPointerToRawData/VPointerToRelocations/VPointerToLineNumbers/vNumberOfRelocations/" +
+                     "vNumberOfLineNumbers/VCharacteristics";
+        for(int i = 0; i < numSections; i++) {
+
+            AssocMap header = Struct.unpack(fmt, m_fileBytes, sectHdrOffset);
+
+            m_sectionHeaders.put(header.getString("Name"),
+                new SectionHeader(
+                        header.getInt("VirtualSize"),
+                        header.getInt("VirtualAddress"),
+                        header.getInt("SizeOfRawData"),
+                        header.getInt("PointerToRawData"),
+                        header.getInt("PointerToRelocations"),
+                        header.getInt("PointerToLineNumbers"),
+                        header.getUINT16("NumberOfRelocations"),
+                        header.getUINT16("NumberOfLineNumbers"),
+                        header.getInt("Characteristics")
+                )
+            );
+            System.out.println(header.getString("Name"));
+            sectHdrOffset += 40;
+        }
     }
 }
