@@ -53,6 +53,17 @@ public class PEViewController {
 
         }
 
+        if(m_exe.getExportDirectory() != null) {
+            TreeItem<String> exportDir = new TreeItem<>("Export Directory");
+            TreeItem<String> exports =new TreeItem<>("Export Listing");
+
+            exportDir.getChildren().add(exports);
+            exportDir.setExpanded(true);
+
+            root.getChildren().add(exportDir);
+
+        }
+
         m_infoView.setRoot(root);
         m_infoView.getSelectionModel().selectedItemProperty().addListener(
             (obs, old, _new) -> {
@@ -64,6 +75,8 @@ public class PEViewController {
                     case "Optional Header"  -> createOptionalHeaderTable();
                     case "Data Directories" -> createDataDirectoriesTable();
                     case "Section Headers"  -> createSectionHeadersTable();
+                    case "Export Directory" -> createExportDirTable();
+                    case "Export Listing"   -> createExportListingTable();
                 }
             }
         );
@@ -236,9 +249,9 @@ public class PEViewController {
         setTable(table);
     }
 
-    private <T> SimpleObjectProperty<T>
+    private <S, T> SimpleObjectProperty<T>
     extractAndFormatFromSectionHeader(TableColumn.CellDataFeatures<Map.Entry, Object> cell, String name, int size) {
-        SectionHeader header = (SectionHeader)(cell.getValue().getValue());
+        S header = (S)(cell.getValue().getValue());
         try {
 
             Method method = header.getClass().getMethod(name);
@@ -256,5 +269,38 @@ public class PEViewController {
 
 
 
+    }
+
+    private void createExportDirTable() {
+
+        var data = m_exe.getExportDirectory().entrySet();
+
+        var table = createMOSVTable().setData(FXCollections.observableArrayList(data)).build();
+
+        setTable(table);
+
+    }
+
+    private void createExportListingTable() {
+        var table = TableBuilder.of(Map.Entry.class)
+            .newColumn("Ordinal", cell -> {
+                return extractAndFormatFromSectionHeader(cell, "getOrdinal", 4);
+            })
+            .newColumn("Function RVA", cell -> {
+                return extractAndFormatFromSectionHeader(cell, "getFunctionRVA", 4);
+            })
+            .newColumn("Name Ordinal", cell -> {
+                return extractAndFormatFromSectionHeader(cell, "getNameOrdinal", 2);
+            })
+            .newColumn("Name RVA", cell -> {
+                return extractAndFormatFromSectionHeader(cell, "getNameRVA", 4);
+            })
+            .newColumn("Name", cell -> {
+                return new SimpleObjectProperty<>(cell.getValue().getKey());
+            })
+            .setData(FXCollections.observableArrayList(m_exe.getExports().entrySet()))
+            .build();
+
+        setTable(table);
     }
 }

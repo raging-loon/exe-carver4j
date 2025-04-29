@@ -147,16 +147,16 @@ public class Struct {
         throw new InvalidFormatException(fmtString);
     }
 
-    private static int extractInt(int counter, byte[] array) {
+    public static int extractInt(int counter, byte[] array) {
         byte b1 = array[counter + 0];
         byte b2 = array[counter + 1];
         byte b3 = array[counter + 2];
         byte b4 = array[counter + 3];
 
-        return      (b4      )
-                |   (b3 << 8 )
-                |   (b2 << 16)
-                |   (b1 << 24) ;
+        return      ((b4 & 0xFF)      )
+                |   ((b3 & 0xFF) << 8 )
+                |   ((b2 & 0xFF) << 16)
+                |   ((b1 & 0xFF) << 24) ;
     }
 
     private static short extractShort(int counter, byte[] array) {
@@ -177,9 +177,8 @@ public class Struct {
     }
 
 
-    private static String extractString(int counter, int maxLen, byte[] array) {
+    public static String extractString(int counter, int maxLen, byte[] array) {
         StringBuilder extract = new StringBuilder();
-        System.out.println("Got extract string: " + maxLen);
 
         for(int i = counter; i < counter + maxLen; i++) {
             if(array[i] == 0)

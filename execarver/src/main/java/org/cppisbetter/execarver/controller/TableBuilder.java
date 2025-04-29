@@ -45,20 +45,14 @@ public class TableBuilder<T> {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.getColumns().addAll(m_cols);
 
-//        int rowCount = m_data.size();
-//
-//        TableHeaderRow headerRow = (TableHeaderRow) table.lookup("TableHeaderRow");
-//
-//        double tableHeight = (rowCount * table.getFixedCellSize())
-//                + table.getInsets().getTop() + table.getInsets().getBottom()
-//                + (headerRow == null ? 0 : headerRow.getHeight());
-//
-//        table.setPrefHeight(tableHeight);
-//        table.setMinHeight(tableHeight);
-//        table.setMinHeight(tableHeight);
-//
+
         table.setFixedCellSize(25);
         table.prefHeightProperty().bind(Bindings.size(table.getItems()).multiply(table.getFixedCellSize()).add(30));
+        table.prefWidth(TableView.USE_COMPUTED_SIZE);
+        AnchorPane.setTopAnchor(table, 0.0);
+        AnchorPane.setBottomAnchor(table, 0.0);
+        AnchorPane.setLeftAnchor(table, 0.0);
+        AnchorPane.setRightAnchor(table, 0.0);
         return table;
     }
 

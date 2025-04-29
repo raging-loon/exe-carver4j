@@ -20,10 +20,10 @@
           </Menu>
         </menus>
       </MenuBar>
-      <SplitPane dividerPositions="0.29797979797979796" prefHeight="364.0" prefWidth="599.0" SplitPane.resizableWithParent="false">
+      <SplitPane dividerPositions="0.29797979797979796" prefHeight="364.0" prefWidth="599.0">
         <items>
             <TreeView fx:id="m_itemView" SplitPane.resizableWithParent="false" />
-          <AnchorPane fx:id="m_infoPane">
+          <AnchorPane fx:id="m_infoPane" SplitPane.resizableWithParent="false">
                <padding>
                   <Insets top="10.0" />
                </padding></AnchorPane>

@@ -6,6 +6,7 @@ import org.cppisbetter.execarver.struct.Struct;
 import org.cppisbetter.execarver.struct.UnpackedValue;
 
 import java.util.LinkedHashMap;
+import java.util.Random;
 
 
 public class PE32 implements BaseCarver {
@@ -13,8 +14,11 @@ public class PE32 implements BaseCarver {
     private AssocMap m_DOSHeader;
     private AssocMap m_NTHeaders;
     private AssocMap m_DataDirectories;
+    private AssocMap m_ExportDirectory;
+
 
     private LinkedHashMap<String, SectionHeader> m_sectionHeaders;
+    private LinkedHashMap<String, FunctionExportData> m_exports;
 
     private final byte[] m_fileBytes;
 
@@ -22,6 +26,7 @@ public class PE32 implements BaseCarver {
 
     public PE32(byte[] file) {
         m_fileBytes = file;
+        m_exports = new LinkedHashMap<>();
     }
 
     public void parse() {
@@ -34,6 +39,7 @@ public class PE32 implements BaseCarver {
         }
 
         parseDataDirectories();
+        parseExports();
     }
 
     public String getMachineType() {
@@ -58,6 +64,11 @@ public class PE32 implements BaseCarver {
     public AssocMap getNTHeaders() { return m_NTHeaders; }
 
     public AssocMap getDataDirectories() { return m_DataDirectories; }
+    public AssocMap getExportDirectory() { return m_ExportDirectory; }
+
+    public LinkedHashMap<String, FunctionExportData> getExports() {
+        return m_exports;
+    }
 
     public LinkedHashMap<String, SectionHeader> getSectionHeaders() {
         return m_sectionHeaders;
@@ -128,7 +139,7 @@ public class PE32 implements BaseCarver {
         m_DataDirectories = Struct.unpack(formatString.toString(), m_fileBytes, offset);
     }
 
-    public void parseSectionHeaders() {
+    private void parseSectionHeaders() {
         int sectHdrOffset = m_NTHeaders.get("Magic").getOffset() + m_NTHeaders.getUINT16("SizeOfOptionalHeader");
 
         short numSections = m_NTHeaders.getUINT16("NumberOfSections");
@@ -157,4 +168,62 @@ public class PE32 implements BaseCarver {
             sectHdrOffset += 40;
         }
     }
+    private void parseExports() {
+        int rva = m_DataDirectories.getInt("Export RVA");
+        int offset = RVAToOffset(rva);
+
+        String exportDirFmt = "VCharacteristics/VTimeDateStamp/vMajorVersion/vMinorVersion/" +
+                              "VName/VBase/VNumberOfFunctions/VNumberOfNames/VAddressOfFunctions/" +
+                              "VAddressOfNames/VAddressOfNameOrdinals";
+
+        m_ExportDirectory = Struct.unpack(exportDirFmt, m_fileBytes, offset);
+
+        int numNames = m_ExportDirectory.getInt("NumberOfNames");
+
+        int nameListOffset     = RVAToOffset(m_ExportDirectory.getInt("AddressOfNames"));
+        int functionListOffset = RVAToOffset(m_ExportDirectory.getInt("AddressOfFunctions"));
+
+        for(int i = 0; i < numNames; i++) {
+            int nameRva = getIntFromOffset(nameListOffset + (i * 4));
+
+            String name = Struct.extractString(RVAToOffset(nameRva), 128, m_fileBytes);
+
+            int functionRva  = getIntFromOffset(functionListOffset + (i * 4));
+
+            m_exports.put(name, new FunctionExportData(
+                    nameRva, functionRva, i + 1, (short)(i)
+            ));
+        }
+
+    }
+
+    private int RVAToOffset(int rva) {
+        assert(m_sectionHeaders != null);
+
+        for(var sectHdr : m_sectionHeaders.entrySet() ) {
+            SectionHeader hdr = sectHdr.getValue();
+            int bounds = hdr.getVirtualAddress() + hdr.getVirtualSize();
+
+            if(rva <= bounds) {
+                return (rva - hdr.getVirtualAddress()) + hdr.getRawAddress();
+            }
+        }
+        return -1;
+    }
+
+    private int getIntFromOffset(int offset) {
+        assert (offset + 4 <= m_fileBytes.length);
+
+        byte b1 = m_fileBytes[offset + 3];
+        byte b2 = m_fileBytes[offset + 2];
+        byte b3 = m_fileBytes[offset + 1];
+        byte b4 = m_fileBytes[offset + 0];
+
+        return      ((b4 & 0xFF)      )
+                |   ((b3 & 0xFF) << 8 )
+                |   ((b2 & 0xFF) << 16)
+                |   ((b1 & 0xFF) << 24) ;
+    }
+
+
 }
