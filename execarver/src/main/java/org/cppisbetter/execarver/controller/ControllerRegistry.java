@@ -9,7 +9,8 @@ import java.util.HashMap;
 ///
 /// PURPOSE
 ///     Associate a view with a controller and FXML file
-///
+///     This is legacy code, stripped out after TableBuilder was written
+///     It is here because it was fun to write
 public class ControllerRegistry {
 
     private static /* internal */ class ViewData {

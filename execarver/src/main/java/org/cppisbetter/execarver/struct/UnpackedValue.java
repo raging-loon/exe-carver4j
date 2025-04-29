@@ -1,5 +1,9 @@
 package org.cppisbetter.execarver.struct;
 
+///
+/// PURPOSE
+///     Wrapper around common table values
+///
 public class UnpackedValue {
 
     private final Object m_value;

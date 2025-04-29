@@ -16,10 +16,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 
+///
+/// PURPOSE
+///     Manage the menu bar
+///
 public class PrimaryController {
-
-    @FXML
-    private MenuItem m_miOpenFile;
 
     @FXML
     private AnchorPane m_infoPane;

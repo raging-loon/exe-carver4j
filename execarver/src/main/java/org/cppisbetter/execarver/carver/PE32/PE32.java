@@ -6,9 +6,11 @@ import org.cppisbetter.execarver.struct.Struct;
 import org.cppisbetter.execarver.struct.UnpackedValue;
 
 import java.util.LinkedHashMap;
-import java.util.Random;
 
-
+///
+/// PURPOSE
+///     Parse/store data about a portable executable
+///
 public class PE32 implements BaseCarver {
 
     private AssocMap m_DOSHeader;
@@ -39,7 +41,8 @@ public class PE32 implements BaseCarver {
         }
 
         parseDataDirectories();
-        parseExports();
+        if(m_DataDirectories.getInt("Export RVA") != 0)
+            parseExports();
     }
 
     public String getMachineType() {
@@ -57,7 +60,7 @@ public class PE32 implements BaseCarver {
 
     public boolean is32Bit() {
         assert(m_NTHeaders != null);
-        return m_NTHeaders.getUINT16("Magic") == 0x20B;
+        return m_NTHeaders.getUINT16("Magic") == 0x10B;
     }
 
     public AssocMap getDOSHeader() { return m_DOSHeader; }
@@ -86,6 +89,14 @@ public class PE32 implements BaseCarver {
     private void parseNTHeader() {
         assert(m_DOSHeader != null);
 
+        short magic = Struct.unpack(
+                "x24/vMagic",
+                m_fileBytes,
+                m_DOSHeader.getInt("e_lfanew")
+        ).getUINT16("Magic");
+
+
+
         String ntHeaderFormat =
                 "VSignature/vMachine/vNumberOfSections/VTimeStamp/VPointerToSymbolTable/" +
                 "VNumberOfSymbols/vSizeOfOptionalHeader/vCharacteristics/" +
@@ -94,8 +105,12 @@ public class PE32 implements BaseCarver {
                 "VSectionAlignment/VFileAlignment/vMajorOSVersion/vMinorOSVersion/vMajorImageVersion/" +
                 "vMinorImageVersion/vMajorSubSystemVersion/vMinorSubsystemVersion/VWin32VersionValue/" +
                 "VSizeOfImage/VSizeOfHeaders/VCheckSum/vSubSystem/vDllCharacteristics/" +
-                "VSizeOfStackReserve/VSizeOfStackCommit/VSizeOfHeapReserve/VSizeOfHeapCommit/" +
+                "QSizeOfStackReserve/QSizeOfStackCommit/QSizeOfHeapReserve/QsSizeOfHeapCommit/" +
                 "VLoaderFlags/VNumberOfRvaAndSizes";
+
+        // Hacky. 0x10B means 32 bit, so replace at QWORDs with DWORDs
+        if(magic == 0x10B)
+            ntHeaderFormat = ntHeaderFormat.replace('Q','V');
 
         m_NTHeaders = Struct.unpack(ntHeaderFormat, m_fileBytes, m_DOSHeader.getInt("e_lfanew"));
     }

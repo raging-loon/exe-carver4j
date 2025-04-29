@@ -2,39 +2,50 @@ package org.cppisbetter.execarver.controller;
 
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
-import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.AnchorPane;
-import javafx.util.Pair;
 import org.cppisbetter.execarver.carver.PE32.PE32;
-import org.cppisbetter.execarver.carver.PE32.SectionHeader;
 import org.cppisbetter.execarver.struct.AssocMap;
 import org.cppisbetter.execarver.struct.UnpackedValue;
 
 import java.lang.reflect.Method;
 import java.util.Map;
-import java.util.Optional;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
 
+///
+/// PURPOSE
+///     Create and manage views/tables for parts of a PE
+///
 public class PEViewController {
-    private AnchorPane m_infoPane;
-    private TreeView<String>   m_infoView;
-    private PE32       m_exe;
+    /// PURPOSE: where tables/views go
+    private final AnchorPane m_infoPane;
+    ///
+    /// PURPOSE
+    ///     Updated with table *listings*
+    ///     based on the contents of the executable
+    private final TreeView<String>   m_infoView;
+    private final PE32       m_exe;
 
+    /// LRU Cache for tables/views
+    private final TableCache m_tcache;
 
     public PEViewController(PE32 exe, TreeView<String> infoView, AnchorPane infoPane) {
         this.m_exe = exe;
         this.m_infoView = infoView;
         this.m_infoPane = infoPane;
 
+        // FIXME: THIS IS HARD CODED
+        m_tcache = new TableCache(5);
+
         m_exe.parse();
     }
-
+    ///
+    /// PURPOSE
+    ///     Added sub views based on what is in the Executable
+    ///     Then add callbacks for the root tree's click handler
+    ///
     public void initializeViews() {
         TreeItem<String> root = new TreeItem<>("File");
         root.setExpanded(true);
@@ -67,6 +78,7 @@ public class PEViewController {
         m_infoView.setRoot(root);
         m_infoView.getSelectionModel().selectedItemProperty().addListener(
             (obs, old, _new) -> {
+                /// These correspond to the actual names of the nodes
                 switch(_new.getValue())
                 {
                     case "DOS Header"       -> createDOSTable2();
@@ -99,15 +111,21 @@ public class PEViewController {
     }
 
     private void createDOSTable2() {
+        if(getAndSetFromCache("DOS TABLE"))
+            return;
+
             var table =
                 createMOSVTable()
                     .setData(FXCollections.observableArrayList(m_exe.getDOSHeader().entrySet()))
                     .build();
 
-            setTable(table);
+            setTable(table, "DOS TABLE");
     }
 
     private void createNTTable() {
+
+        if(getAndSetFromCache("NTHDR"))
+            return;
         // sloppy
         AssocMap ntHeader = m_exe.getNTHeaders();
         // we only have one value
@@ -115,19 +133,21 @@ public class PEViewController {
             createMOSVTable()
                 .setData(FXCollections.observableArrayList(ntHeader.entrySet().stream().findFirst().get()))
                 .build();
-        setTable(table);
+        setTable(table, "NTHDR");
 
 
     }
 
     private void createFileHeaderTable() {
+
+        if(getAndSetFromCache("FILEHDR"))
+            return;
         var data = m_exe.getNTHeaders().entrySet().stream().toList().subList(1, 8);
 
         var table =
             createMOSVTable()
                 .newColumn("Meaning", cell -> {
                         String value = "";
-                        System.out.println(cell.getValue().getKey());
 
                         if (cell.getValue().getKey().equals("Machine")) {
                             value = m_exe.getMachineType();
@@ -139,12 +159,15 @@ public class PEViewController {
                 )
                 .setData(FXCollections.observableArrayList(data))
                 .build();
-        setTable(table);
+        setTable(table, "FILEHDR");
 
 
     }
 
     private void createOptionalHeaderTable() {
+
+        if(getAndSetFromCache("OPTHDR"))
+            return;
         var data = m_exe.getNTHeaders().entrySet().stream().toList().subList(8, 37);
 
         var table =
@@ -163,16 +186,20 @@ public class PEViewController {
                 )
                 .setData(FXCollections.observableArrayList(data))
                 .build();
-        setTable(table);
+
+        setTable(table, "OPTHDR");
 
     }
 
     private void createDataDirectoriesTable() {
+
+        if(getAndSetFromCache("DATA DIR"))
+            return;
         var data = m_exe.getDataDirectories();
 
         var table = createMOSVTable().setData(FXCollections.observableArrayList(data.entrySet())).build();
 
-        setTable(table);
+        setTable(table, "DATA DIR");
 
 
     }
@@ -205,52 +232,65 @@ public class PEViewController {
                     );
                 });
     }
-
-    private void setTable(TableView<?> newTable) {
+    ///
+    /// PURPOSE
+    ///     Set and cache a table
+    ///
+    private void setTable(TableView<?> newTable, String name) {
         if(!m_infoPane.getChildren().isEmpty())
-            m_infoPane.getChildren().removeFirst();
+            m_infoPane.getChildren().clear();
         m_infoPane.getChildren().add(newTable);
+
+        cacheTable(name, newTable);
     }
 
     private void createSectionHeadersTable() {
-
+        if(getAndSetFromCache("SECHDR"))
+            return;
         var table = TableBuilder.of(Map.Entry.class)
                 .newColumn("Name", cell -> new SimpleObjectProperty<>(cell.getValue().getKey()))
                 .newColumn("Virtual Size", cell -> {
-                    return extractAndFormatFromSectionHeader(cell, "getVirtualSize", 4);
+                    return extractAndFormatFromVariant(cell, "getVirtualSize", 4);
                 })
                 .newColumn("Virtual Address", cell -> {
-                    return extractAndFormatFromSectionHeader(cell, "getVirtualAddress", 4);
+                    return extractAndFormatFromVariant(cell, "getVirtualAddress", 4);
                 })
                 .newColumn("Raw Size", cell -> {
-                    return extractAndFormatFromSectionHeader(cell, "getRawSize", 4);
+                    return extractAndFormatFromVariant(cell, "getRawSize", 4);
                 })
                 .newColumn("Raw Address", cell -> {
-                    return extractAndFormatFromSectionHeader(cell, "getRawAddress", 4);
+                    return extractAndFormatFromVariant(cell, "getRawAddress", 4);
                 })
                 .newColumn("Reloc Address", cell -> {
-                    return extractAndFormatFromSectionHeader(cell, "getRelocAddress", 4);
+                    return extractAndFormatFromVariant(cell, "getRelocAddress", 4);
                 })
                 .newColumn("Linenumbers", cell -> {
-                    return extractAndFormatFromSectionHeader(cell, "getLineNumbers", 4);
+                    return extractAndFormatFromVariant(cell, "getLineNumbers", 4);
                 })
                 .newColumn("Relocations Number", cell -> {
-                    return extractAndFormatFromSectionHeader(cell, "getRelocationsNumber", 2);
+                    return extractAndFormatFromVariant(cell, "getRelocationsNumber", 2);
                 })
                 .newColumn("Line Numbers", cell -> {
-                    return extractAndFormatFromSectionHeader(cell, "getLineNumbersNumber", 2);
+                    return extractAndFormatFromVariant(cell, "getLineNumbersNumber", 2);
                 })
                 .newColumn("Characteristics", cell -> {
-                    return extractAndFormatFromSectionHeader(cell, "getCharacteristics", 4);
+                    return extractAndFormatFromVariant(cell, "getCharacteristics", 4);
                 })
                 .setData(FXCollections.observableArrayList(m_exe.getSectionHeaders().entrySet()))
                 .build();
 
-        setTable(table);
+        setTable(table, "SECHDR");
     }
 
+    ///
+    /// PURPOSE
+    ///     Extract methods from any arbitrary class, execute them, and format the result as hex
+    ///
+    /// NOTE
+    ///     This is a bit hacky and not entirely typesafe....
+    ///
     private <S, T> SimpleObjectProperty<T>
-    extractAndFormatFromSectionHeader(TableColumn.CellDataFeatures<Map.Entry, Object> cell, String name, int size) {
+    extractAndFormatFromVariant(TableColumn.CellDataFeatures<Map.Entry, Object> cell, String name, int size) {
         S header = (S)(cell.getValue().getValue());
         try {
 
@@ -273,27 +313,33 @@ public class PEViewController {
 
     private void createExportDirTable() {
 
+        if(getAndSetFromCache("EXPORT DIR"))
+            return;
         var data = m_exe.getExportDirectory().entrySet();
 
         var table = createMOSVTable().setData(FXCollections.observableArrayList(data)).build();
 
-        setTable(table);
+        setTable(table, "EXPORT DIR");
 
     }
 
     private void createExportListingTable() {
+
+        if(getAndSetFromCache("EXPORT LISTING"))
+            return;
+
         var table = TableBuilder.of(Map.Entry.class)
             .newColumn("Ordinal", cell -> {
-                return extractAndFormatFromSectionHeader(cell, "getOrdinal", 4);
+                return extractAndFormatFromVariant(cell, "getOrdinal", 4);
             })
             .newColumn("Function RVA", cell -> {
-                return extractAndFormatFromSectionHeader(cell, "getFunctionRVA", 4);
+                return extractAndFormatFromVariant(cell, "getFunctionRVA", 4);
             })
             .newColumn("Name Ordinal", cell -> {
-                return extractAndFormatFromSectionHeader(cell, "getNameOrdinal", 2);
+                return extractAndFormatFromVariant(cell, "getNameOrdinal", 2);
             })
             .newColumn("Name RVA", cell -> {
-                return extractAndFormatFromSectionHeader(cell, "getNameRVA", 4);
+                return extractAndFormatFromVariant(cell, "getNameRVA", 4);
             })
             .newColumn("Name", cell -> {
                 return new SimpleObjectProperty<>(cell.getValue().getKey());
@@ -301,6 +347,26 @@ public class PEViewController {
             .setData(FXCollections.observableArrayList(m_exe.getExports().entrySet()))
             .build();
 
-        setTable(table);
+        setTable(table, "EXPORT LISTING");
+    }
+
+    ///
+    /// PURPOSE
+    ///     *Get* a table from the cache and *set* it if it exists
+    ///
+    private boolean getAndSetFromCache(String name) {
+        TableView<?> table = m_tcache.get(name);
+        m_tcache.printCache();
+        if(table != null) {
+            setTable(table, name);
+            System.out.println("Pulling " + name + " from cache");
+            return true;
+        }
+
+        return false;
+    }
+
+    private void cacheTable(String name, TableView<?> table) {
+        m_tcache.put(name, table);
     }
 }
